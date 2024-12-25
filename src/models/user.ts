@@ -51,6 +51,7 @@ export const getUserWithPosts = async (
     where: {
       id: userId,
     },
+    // 通常の投稿を取得
     select: {
       ...selectUserColumnsWithoutPassword,
       posts: {
@@ -70,9 +71,46 @@ export const getUserWithPosts = async (
           },
         },
       },
+      // リツイートした投稿を取得
+      retweets: {
+        select: {
+          post: {
+            select: {
+              id: true,
+              content: true,
+              userId: true,
+              // createdAt: true,
+              updatedAt: true,
+              user: {
+                select: {
+                  ...selectUserColumnsWithoutPassword,
+                },
+              },
+            },
+          },
+          createdAt: true, // リツイートした日時
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      },
     },
   });
   if (user === null) return null;
+
+  // リツイートデータを整形
+  const formattedRetweets = user.retweets.map(retweet => ({
+    ...retweet.post,
+    createdAt: retweet.createdAt, // リツイートした日時
+    retweetedAt: retweet.createdAt,
+    retweetedBy: retweet.post.user.name, // リツイートしたユーザーの名前
+  }));
+  user.posts = [...user.posts, ...formattedRetweets];
+
+  user.posts.sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+
   return user;
 };
 

@@ -66,7 +66,7 @@ export const getPost = async (postId: number): Promise<PostWithUser | null> => {
 
 export const getAllPosts = async (): Promise<PostWithUser[]> => {
   const prisma = databaseManager.getInstance();
-  const post = await prisma.post.findMany({
+  let post = await prisma.post.findMany({
     orderBy: {
       createdAt: "desc",
     },
@@ -83,5 +83,42 @@ export const getAllPosts = async (): Promise<PostWithUser[]> => {
       },
     },
   });
+  const retweets = await prisma.retweet.findMany({
+    orderBy: {
+      createdAt: "desc",
+    },
+    select: {
+      post: {
+        select: {
+          id: true,
+          content: true,
+          userId: true,
+          // createdAt: true,
+          updatedAt: true,
+          user: {
+            select: {
+              ...selectUserColumnsWithoutPassword,
+            },
+          },
+        },
+      },
+      createdAt: true, // リツイートした日時
+    },
+  });
+
+  // リツイートデータを整形
+  const formattedRetweets = retweets.map(retweet => ({
+    ...retweet.post,
+    createdAt: retweet.createdAt,
+    retweetedAt: retweet.createdAt,
+    retweetedBy: retweet.post.user.name,
+  }));
+
+  post = [...post, ...formattedRetweets];
+
+  post.sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+
   return post;
 };
